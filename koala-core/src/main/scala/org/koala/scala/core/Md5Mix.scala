@@ -1,4 +1,4 @@
-package koala.scala.core
+package org.koala.scala.core
 
 import java.io.{FileInputStream, BufferedInputStream, File}
 import java.security.MessageDigest

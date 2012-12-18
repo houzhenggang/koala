@@ -1,8 +1,7 @@
-package koala.scala.core
+package org.koala.scala.core
 
 import io.Source
 import java.io.{FileWriter, BufferedWriter, File, PrintWriter}
-import org.apache.commons.io.FileUtils
 
 /**
  * 隐式转换扩展File操作；

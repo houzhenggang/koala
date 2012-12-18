@@ -1,1 +1,0 @@
-${user}|${hello.name}|${hello.age}
