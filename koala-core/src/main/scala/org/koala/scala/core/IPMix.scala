@@ -5,7 +5,7 @@ package org.koala.scala.core
  * @param str
  */
 class IPMix(str: String) {
-  def toBinary(): Int = {
+  def toBinary: Int = {
     val ips = str.split("\\.")
     if (ips == null || ips.length != 4) {
       throw new NumberFormatException()
@@ -13,7 +13,7 @@ class IPMix(str: String) {
     (ips(0).toInt << 24) + (ips(1).toInt << 16) + (ips(2).toInt << 8) + ips(3).toInt
   }
 
-  def toNetBinary(): Int = {
+  def toNetBinary: Int = {
     val ips = str.split("\\.")
     if (ips == null || ips.length != 4) {
       throw new NumberFormatException()
@@ -23,5 +23,5 @@ class IPMix(str: String) {
 }
 
 object IPMix {
-  implicit def ipmix(str: String) = new IPMix(str)
+  implicit def ip(str: String) = new IPMix(str)
 }

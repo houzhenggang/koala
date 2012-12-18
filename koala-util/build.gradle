@@ -1,7 +1,9 @@
-dependencies{
-
+dependencies {
+    compile(
+            'commons-codec:commons-codec:1.7'
+    )
 }
-task sayHello <<  {
-	println "Hello KOALA-ORM."
+task sayHello << {
+    println "Hello KOALA-ORM."
 }
 

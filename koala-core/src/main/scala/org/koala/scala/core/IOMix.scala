@@ -2,17 +2,19 @@ package org.koala.scala.core
 
 import io.Source
 import java.io.{FileWriter, BufferedWriter, File, PrintWriter}
+import org.apache.commons.io.FileUtils
 
 /**
  * 隐式转换扩展File操作；
  * @param file
  */
 class IOMix(file: File) {
-  def text = {
-    val bufferSource = Source.fromFile({
-      if (!file.exists()) file.createNewFile()
-      file
-    })
+  /**
+   * @return
+   */
+  def text: String = {
+    if (!file.exists()) file.createNewFile()
+    val bufferSource = Source.fromFile(file)
     try {
       bufferSource.mkString
     }
@@ -21,16 +23,15 @@ class IOMix(file: File) {
     }
   }
 
-  def text_=(s: String) {
+  def text(content: String) {
     withPrintWriter {
       writer =>
-        writer.print(s)
+        writer.print(content)
     }
   }
 
   def withPrintWriter(op: PrintWriter => Unit) {
-    if (!file.getParentFile.exists())
-      FileUtils.forceMkdir(file.getParentFile)
+    if (!file.getParentFile.exists()) FileUtils.forceMkdir(file.getParentFile)
     val p = new PrintWriter(file)
     try {
       op(p)
@@ -40,8 +41,7 @@ class IOMix(file: File) {
   }
 
   def withBufferedWriter(op: BufferedWriter => Unit) {
-    if (!file.getParentFile.exists())
-      FileUtils.forceMkdir(file.getParentFile)
+    if (!file.getParentFile.exists()) FileUtils.forceMkdir(file.getParentFile)
     val p = new BufferedWriter(new FileWriter(file))
     try {
       op(p)
@@ -80,6 +80,6 @@ class IOMix(file: File) {
 }
 
 object IOMix {
-  implicit def iomix(file: File) = new IOMix(file)
+  implicit def io(file: File) = new IOMix(file)
 }
 
