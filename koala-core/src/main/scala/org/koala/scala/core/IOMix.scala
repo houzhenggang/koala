@@ -10,6 +10,9 @@ import org.apache.commons.io.FileUtils
  */
 class IOMix(file: File) {
   /**
+   * <p>我也不知道这是搞什么飞机</p>
+   * @since 1.1
+   *        <p> 这个是搞什么飞机啊</p>
    * @return
    */
   def text: String = {
