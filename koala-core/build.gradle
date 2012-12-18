@@ -1,0 +1,10 @@
+dependencies {
+    compile(
+            'org.freemarker:freemarker:2.3.19',
+            'com.jolbox:bonecp:0.8.0-rc1'
+    )
+}
+task sayHello << {
+    println "Hello KOALA-CORE."
+}
+

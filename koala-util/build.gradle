@@ -1,0 +1,7 @@
+dependencies{
+
+}
+task sayHello <<  {
+	println "Hello KOALA-ORM."
+}
+
