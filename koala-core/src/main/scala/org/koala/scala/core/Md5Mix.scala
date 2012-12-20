@@ -27,7 +27,7 @@ trait Md5 {
 }
 
 
-class FileMd5(val file: File) extends Md5 {
+class Md5File(val file: File) extends Md5 {
 
 
   @Deprecated
@@ -61,7 +61,7 @@ class FileMd5(val file: File) extends Md5 {
   }
 }
 
-class StrMd5(val str: String) extends Md5 {
+class Md5String(val str: String) extends Md5 {
 
   @Deprecated
   def handle(): String = {
@@ -86,7 +86,7 @@ class StrMd5(val str: String) extends Md5 {
 object Md5Mix {
   val hexDigits = List("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f")
 
-  implicit def fileToMd5(file: File) = new FileMd5(file)
+  implicit def fileToMd5(file: File) = new Md5File(file)
 
-  implicit def strToMd5(str: String) = new StrMd5(str)
+  implicit def stringToMd5(str: String) = new Md5String(str)
 }

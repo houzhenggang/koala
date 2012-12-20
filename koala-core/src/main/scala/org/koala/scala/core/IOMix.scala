@@ -17,7 +17,6 @@ import org.apache.commons.io.FileUtils
 class IOMix(file: File) {
   /**
    * <p>读取文件内容作为字符串。</p>
-   * @since 1.0
    * @return 返回字符串文件内容。
    */
   def text: String = {
