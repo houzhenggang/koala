@@ -1,6 +1,6 @@
 dependencies {
     compile(
-            'commons-codec:commons-codec:$commons-codec'
+            "commons-codec:commons-codec:${commons_codecVer}"
     )
 }
 task sayHello << {

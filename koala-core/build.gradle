@@ -1,7 +1,7 @@
 dependencies {
     compile(
-            'org.freemarker:freemarker:2.3.19',
-            'commons-io:commons-io:2.4'
+            'org.freemarker:freemarker:$freemarkerVer',
+            "commons-io:commons-io:$commons_ioVer"
     )
 }
 task sayHello << {
