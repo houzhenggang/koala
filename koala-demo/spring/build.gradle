@@ -1,0 +1,46 @@
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'war'
+apply plugin: 'tomcat'
+apply plugin: 'jetty'
+
+repositories {
+    mavenLocal()
+    maven { url 'maven.oschina.net/content/groups/public/' }
+    maven { url "http://repo.spring.io/plugins-release" }
+}
+
+dependencies {
+    tomcat "org.apache.tomcat.embed:tomcat-embed-core:${tomcatVersion}",
+            "org.apache.tomcat.embed:tomcat-embed-logging-juli:${tomcatVersion}"
+    tomcat("org.apache.tomcat.embed:tomcat-embed-jasper:${tomcatVersion}") {
+        exclude group: 'org.eclipse.jdt.core.compiler', module: 'ecj'
+    }
+    compile("joda-time:joda-time:$joda_time",
+            "org.springframework:spring-web:$spring",
+            "org.springframework:spring-webmvc:$spring",
+            "org.springframework.security:spring-security-web:$security",
+            "org.springframework.security:spring-security-config:$security",
+            "org.hibernate:hibernate-validator:$hibernate_validator",
+            "org.thymeleaf:thymeleaf-spring3:$thymeleaf",
+            "org.thymeleaf.extras:thymeleaf-extras-springsecurity3:$thymeleaf_extras",
+            "com.fasterxml.jackson.core:jackson-databind:$jackson",
+            "ch.qos.logback:logback-classic:$logback")
+    testCompile("junit:junit:$junit")
+
+    providedCompile 'javax.servlet:javax.servlet-api:3.0.1'
+    runtime 'javax.servlet:jstl:1.1.2'
+}
+
+buildscript {
+    repositories {
+        maven { url 'http://repo.spring.io/plugins-release' }
+    }
+    dependencies {
+        classpath 'org.gradle.api.plugins:gradle-tomcat-plugin:0.9.8'
+    }
+}
+
+[tomcatRun, tomcatRunWar]*.contextPath = '/demo'
+[jettyRun, jettyRunWar]*.contextPath = 'demo'

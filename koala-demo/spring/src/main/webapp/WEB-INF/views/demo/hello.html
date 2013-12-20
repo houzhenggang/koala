@@ -1,0 +1,14 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="layout/boot::header" th:with="title=#{welcome.title}">
+</head>
+<body>
+	<h1 th:include="layout/boot::head"></h1>
+	<p th:text="'Hello, ' + ${name} + '!'" />
+	<h1 th:text="${name}">Nothing</h1>
+	<h2 th:text="#{welcome.title}">Nothing</h2>
+	<span th:utext="#{home.welcome}">Nothing</span>
+	<div th:include="layout/boot::copy">111</div>
+	<h1 th:include="layout/boot::footer"></h1>
+</body>
+</html>

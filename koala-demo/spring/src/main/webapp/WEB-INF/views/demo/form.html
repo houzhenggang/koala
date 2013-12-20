@@ -1,0 +1,18 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+	<form action="#" th:action="@{/form}"
+		th:object="<#noparse>$</#noparse>{person}" method="post">
+		<table>
+			<tr>
+				<td>How old are you?</td>
+				<td><input type="text" th:field="*{age}" /></td>
+				<td><div id="errors" th:text="<#noparse>$</#noparse>{error}" /></td>
+			</tr>
+			<tr>
+				<td><button type="submit">Submit</button></td>
+			</tr>
+		</table>		
+	</form>
+</body>
+</html>
