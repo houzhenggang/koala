@@ -1,8 +1,7 @@
 /* 
  * File:   yf_pcap.h
- * Author: Administrator
+ * Author: yafengli@sina.com
  *
- * Created on September 9, 2014, 3:47 PM
  */
 
 #ifndef _YF_PCAP_H

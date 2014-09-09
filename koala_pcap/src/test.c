@@ -57,7 +57,7 @@ void packet_info(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char *
   struct sniff_udp *udp;
   struct sniff_dns *dns; //dns报头
   const char *payload;
-  int pay_size; //数据包大小
+  int pay_size; //
 
   eth = (ethernet *) packet;
   if (check_pkt(eth) == -1) {
