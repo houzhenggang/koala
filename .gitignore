@@ -21,6 +21,12 @@ nbproject/
 
 #Cmake
 CMakeFiles/
+bin/
+build/
+CMakeCache.txt
+cmake_*
+compile_*
+Makefile
 
 # Gradle
 build/

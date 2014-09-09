@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <phd_trim.h>
 #include <pcap.h>
-#include <phd_test.h>
+
+#include <yf_trim.h>
+#include <yf_pcap.h>
 
 typedef struct sniff_ethernet ethernet;
 
