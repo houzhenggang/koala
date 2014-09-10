@@ -144,7 +144,7 @@ void loop_dev(char *errBuf, char *dev, pcap_handler callback) {
 
 int main(int argc, char *argv[]) {
   if (argc != 3) {
-    printf("Usage:command -i [eth_name]");
+    printf("Usage:command -i [device name]\n");
     exit(-1);
   }
 
