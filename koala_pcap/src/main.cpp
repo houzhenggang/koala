@@ -1,12 +1,12 @@
 #include <iostream>
 #include <cmath>
-#include "hello"
-
-
-extern "C" {
 #include <pcap.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "hello"
+
+extern "C" {
 #include "yf_trim.h"
 }
 
