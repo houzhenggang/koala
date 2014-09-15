@@ -33,6 +33,7 @@ build/
 .gradle
 
 #Intellij IDEA
+.idea/
 *.iml
 *.ipr
 *.iws

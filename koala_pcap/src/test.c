@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <pcap.h>
-
+#include <ctype.h>
 #include <yf_trim.h>
 #include <yf_pcap.h>
 

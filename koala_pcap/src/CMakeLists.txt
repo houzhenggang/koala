@@ -1,5 +1,3 @@
-include_directories(../include)
-
 set(SRC_LIST test.c)
 set(DEMO_SRC_LIST demo.c)
 set(YF_TRIM_LIB_SRC_LIST yf_trim.c)
