@@ -1,0 +1,56 @@
+#ifndef _HELLO_H
+#define _HELLO_H
+
+#define IS_SPACE(x) ((x)==' '||(x)=='\r'||(x)=='\n'||(x)=='f'||(x)=='\b'||(x)=='\t')
+#define OPTION_BUF_LEN 1024
+
+#include <iostream>
+
+namespace hello {
+  using namespace std;
+
+  class stu {
+  protected:
+    int age;
+    string name;
+  public:
+    int add(int a, int b) {
+      return a + b;
+    }
+  };
+
+  class score : public stu {
+  protected:
+    int sco;
+  };
+
+  template<typename T1, typename T2>
+  class my_class {
+  private:
+    T1 I;
+    T2 J;
+  public:
+    my_class(T1 a, T2 b);
+
+    void show();
+  };
+
+  template<typename T1, typename T2>
+  my_class<T1, T2>::my_class(T1 a, T2 b) : I(a), J(b) {
+  }
+
+  template<typename T1, typename T2>
+  void my_class<T1, T2>::show() {
+    cout << "I=" << I << ",J=" << J << endl;
+  }
+
+  string &s_trim(string &s) {
+    if (s.empty()) {
+      return s;
+    }
+    s.erase(0, s.find_first_not_of(" "));
+    s.erase(s.find_last_not_of(" ") + 1);
+    return s;
+  }
+};
+#endif
