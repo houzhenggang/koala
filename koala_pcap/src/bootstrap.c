@@ -1,11 +1,13 @@
 #include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
 #include <string.h>
 #include <pcap.h>
 
 #include "yf_net.h"
 #include "yf_trim.h"
 
-void call(char *devStr, char *errBuf, char *exp, pcap_handler callback) {
+void call(char *devStr, char *errBuf, char *exp, pcap_handler callback) {    
   /* open a device, wait until a packet arrives */
   pcap_t *device = pcap_open_live(devStr, 65535, 1, 0, errBuf);
 
@@ -70,6 +72,7 @@ int main(int argc, char **argv) {
   char errBuf[PCAP_ERRBUF_SIZE];
   memset(errBuf, 0, sizeof (errBuf));
   char *dev = (char *) malloc(OPTION_BUF_LEN);
+  memset(dev, 0, OPTION_BUF_LEN);
   char exp[1024];
   memset(exp, 0, sizeof (exp));
   printf("expression length:%d\n", sizeof (exp));

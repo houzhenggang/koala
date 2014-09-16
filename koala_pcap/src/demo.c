@@ -1,11 +1,10 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/unistd.h>
 #include <ctype.h>
 #include <pthread.h>
-#include "yf_trim.h"
 
+#include "yf_trim.h"
 
 void pthread(void);
 
