@@ -1,7 +1,4 @@
-set(CMAKE_INSTALL_PREFIX /usr/local)
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
-
-include_directories(. ../include)
+include_directories(../include ../../../../cygwin/usr/include)
 
 set(DEMO_SRC_LIST demo.c)
 set(YF_TRIM_LIB_SRC_LIST yf_trim.c)
