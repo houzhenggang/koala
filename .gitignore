@@ -27,6 +27,9 @@ CMakeCache.txt
 cmake_*
 compile_*
 Makefile
+*.dll
+*.dll.a
+*.exe
 
 # Gradle
 build/
