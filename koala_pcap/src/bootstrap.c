@@ -21,15 +21,13 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  pthread_t pid_a, pid_b; //
-  int a_status, b_status;
+  pthread_t pid_a; //
+  int a_status;
 
   pdt_args_t p_a;
-
   memset(p_a.errbuf, 0, sizeof (p_a.errbuf));
   memset(p_a.dev, 0, sizeof (p_a.dev));
   memset(p_a.exp, 0, sizeof (p_a.exp));
-  printf("expression length:%d\n", sizeof (p_a.exp));
   int i;
   for (i = 1; i < argc; i++) {
     if (argv[i][0] == '-' || argv[i][0] == '/') {
