@@ -83,12 +83,14 @@ void loop_dev(char *errBuf, char *dev, char *exp, pcap_handler callback) {
   pcap_if_t *alldevs;
   int found = -1;
   if (pcap_findalldevs(&alldevs, errBuf) == 0) {
-    printf("device:%s\n", dev);
+    printf("devices:[ ");
     for (; alldevs != NULL; alldevs = alldevs->next) {
+      printf("%s ", alldevs->name);
       if (strcmp(alldevs->name, dev) == 0) {
         found = 0;
       }
     }
+    puts("]");
   }
   if (found == -1) {
     printf("Not found device:%s\n", dev);
@@ -124,7 +126,7 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
   printf("\n\n");
 }
 
-void net_demo(char *src_ip_str, char *dev) {
+void net_demo(char *src_ip_str, char *dev, char *packet) {
   libnet_t *net_t = NULL;
   char err_buf[LIBNET_ERRBUF_SIZE];
   libnet_ptag_t p_tag;
@@ -139,6 +141,8 @@ void net_demo(char *src_ip_str, char *dev) {
     printf("libnet_init error\n");
     exit(0);
   }
+  char packet[] = {0x01, 0x02, 0x03, 0x04};
+  libnet_write_link(net_t, packet, 4);
   p_tag = libnet_build_arp(
       ARPHRD_ETHER, //hardware type ethernet
       ETHERTYPE_IP, //protocol type
