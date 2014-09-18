@@ -25,6 +25,11 @@
 #define P_ARP 0x0806
 #define P_RARP 0x8035
 
+/*libnet use*/
+#define MAC_ADDR_LEN 6
+#define IP_ADDR_LEN 4
+#define LIBNET_DNS_H 0xc
+
 /*Ethernet*/
 struct sniff_ethernet {
   u_char ether_dhost[ETHER_ADDR_LEN];

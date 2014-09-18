@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+#include <libnet.h>
 #include <pcap.h>
-#include <ctype.h>
 
 #include "yf_net.h"
 #include "yf_trim.h"
@@ -68,6 +68,8 @@ void getPacket(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pack
 	printf("\n\n");
 }
 
+extern void net_demo(char *src_ip_str);
+
 int main(int argc, char **argv) {
 	if (argc < 3) {
 		printf("Usage:command -i [device name] [expression]\n");
@@ -102,4 +104,65 @@ int main(int argc, char **argv) {
 	}
 	free(dev);
 	return 0;
+}
+
+void net_demo(char *src_ip_str) {
+	libnet_t *net_t = NULL;
+	char *dev = "eth0";
+	char err_buf[LIBNET_ERRBUF_SIZE];
+	libnet_ptag_t p_tag;
+	unsigned char src_mac[MAC_ADDR_LEN] = {0x00, 0x00, 0xf1, 0xe8, 0x0e, 0xc8};//发送者网卡地址
+
+	unsigned char dst_mac[MAC_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};//接收者网卡地址
+
+	unsigned long src_ip, dst_ip = 0;
+	src_ip = libnet_name2addr4(net_t, src_ip_str, LIBNET_RESOLVE);//将字符串类型的ip转换为顺序网络字节流
+	net_t = libnet_init(LIBNET_LINK_ADV, dev, err_buf);//初始化发送包结构
+	if (net_t == NULL) {
+		printf("libnet_init error\n");
+		exit(0)
+
+	}
+
+	p_tag = libnet_build_arp(
+			ARPHRD_ETHER,//hardware type ethernet
+			ETHERTYPE_IP,//protocol type
+			MAC_ADDR_LEN,//mac length
+			IP_ADDR_LEN,//protocol length
+			ARPOP_REPLY,//op type
+			(u_int8_t *) src_mac,//source mac addr这里的作用是更新目的地的arp表
+			(u_int8_t * ) & src_ip,//source ip addr
+			(u_int8_t *) dst_mac,//source mac addr
+			(u_int8_t * ) & dst_ip,//dest ip addr
+			NULL,//payload
+			0,//payload length
+			net_t,//libnet context
+			0//0 stands to build a new one
+	);
+	if (-1 == p_tag) {
+		printf("libnet_build_arp error");
+		exit(0);
+	}
+
+	//以太网头部
+	p_tag = libnet_build_ethernet(//create ethernet header
+			(u_int8_t *) dst_mac,//dest mac addr
+			(u_int8_t *) src_mac,//source mac addr
+			ETHERTYPE_ARP,//protocol type
+			NULL,//payload
+			0,//payload length
+			net_t,//libnet context
+			0//0 to build a new one
+	);
+
+	if (-1 == p_tag) {
+		printf("libnet_build_ethernet error!\n");
+		exit(1);
+	}
+	int res;
+	if (-1 == (res = libnet_write(net_t))) {
+		printf("libnet_write error!\n");
+		exit(1);
+	}
+	libnet_destroy(net_t);
 }
