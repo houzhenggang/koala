@@ -5,7 +5,7 @@
  */
 
 #ifndef _YF_PCAP_H
-#define	_YF_PCAP_H
+#define  _YF_PCAP_H
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -19,7 +19,6 @@
 
 #define TRUE 1
 #define FALSE -1
-#define ETHER_ADDR_LEN 6
 
 #define P_IP 0x0800
 #define P_ARP 0x0806
@@ -28,7 +27,6 @@
 /*libnet use*/
 #define MAC_ADDR_LEN 6
 #define IP_ADDR_LEN 4
-#define LIBNET_DNS_H 0xc
 
 /*Ethernet*/
 struct sniff_ethernet {
@@ -89,5 +87,13 @@ struct sniff_dns {
   u_short dns_add;
   u_int8_t *dsn_data;
 };
+
+/*PTHREAD STRUCTOR*/
+#define PTHREAD_ARG_LEN 256
+typedef struct pdt_args {
+  char errbuf[PCAP_ERRBUF_SIZE];
+  char dev[PTHREAD_ARG_LEN];
+  char exp[PTHREAD_ARG_LEN];
+} pdt_args_t;
 #endif	/* YF_PCAP_H */
 
