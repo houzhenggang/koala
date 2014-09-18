@@ -10,10 +10,10 @@
 #include "yf_trim.h"
 
 extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
-extern void call(char *devStr, char *errBuf, char *exp, pcap_handler callback);
+extern void call(char *errBuf, char *devStr, char *exp, pcap_handler callback);
 extern void loop_dev(char *errBuf, char *dev, char *exp, pcap_handler callback);
-extern void* loop_dev(void*);
-extern void net_demo(char *src_ip_str);
+extern void* pthread_run(void*);
+extern void net_demo(char *src_ip_str, char* dev);
 
 int main(int argc, char **argv) {
   if (argc < 3) {
@@ -24,32 +24,29 @@ int main(int argc, char **argv) {
   pthread_t pid_a, pid_b; //
   int a_status, b_status;
 
-  pdt_args_t pdt_args;
+  pdt_args_t p_a;
 
-  memset(pdt_args->errbuf, 0, sizeof (pdt_args->errbuf));
-  memset(pdt_args->dev, 0, sizeof (pdt_args->dev));
-  memset(pdt_args->exp, 0, sizeof (pdt_args->exp));
-  printf("expression length:%d\n", sizeof (pdt_args->exp));
+  memset(p_a.errbuf, 0, sizeof (p_a.errbuf));
+  memset(p_a.dev, 0, sizeof (p_a.dev));
+  memset(p_a.exp, 0, sizeof (p_a.exp));
+  printf("expression length:%d\n", sizeof (p_a.exp));
   int i;
   for (i = 1; i < argc; i++) {
     if (argv[i][0] == '-' || argv[i][0] == '/') {
       switch (tolower(argv[i][1])) {
         case 'i':
-          trim(argv[++i], pdt_args->dev);
+          trim(argv[++i], p_a.dev);
           int k;
           for (k = i + 1; k < argc; k++) {
-            strcat(pdt_args->exp, argv[k]);
-            if (k < argc - 1) strcat(pdt_args->exp, " ");
+            strcat(p_a.exp, argv[k]);
+            if (k < argc - 1) strcat(p_a.exp, " ");
           }
-          printf("expression:%s\n", pdt_args->exp);
-
-          a_status = pthread_create(&pid_a, NULL, loop_dev, &pdt_args);
+          a_status = pthread_create(&pid_a, NULL, pthread_run, &p_a);
           if (a_status != 0) {
             printf("ERROR.");
             exit(-1);
           }
           pthread_join(pid_a, NULL);
-          //loop_dev(errBuf, dev, exp, proc_packet);
           break;
         default:
           printf("Usage:command -i [device_name]");
@@ -59,7 +56,7 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-void call(char *devStr, char *errBuf, char *exp, pcap_handler callback) {
+void call(char *errBuf, char *devStr, char *exp, pcap_handler callback) {
   /* open a device, wait until a packet arrives */
   pcap_t *device = pcap_open_live(devStr, 65535, 1, 0, errBuf);
 
@@ -78,32 +75,36 @@ void call(char *devStr, char *errBuf, char *exp, pcap_handler callback) {
   pcap_close(device);
 }
 
-void* loop_dev(void *arg) {
+void* pthread_run(void *arg) {
   pdt_args_t p_a = *(pdt_args_t *) arg;
-  printf("dev:%s exp:%s\n", p_a->dev, p_a->exp);
-  loop_dev(p_a->errbuf, p_a->dev, p_a->exp, proc_packet);
+  printf("dev:%s exp:%s\n", p_a.dev, p_a.exp);
+  loop_dev(p_a.errbuf, p_a.dev, p_a.exp, proc_packet);
 }
 
 void loop_dev(char *errBuf, char *dev, char *exp, pcap_handler callback) {
   pcap_if_t *alldevs;
-
+  int found = -1;
   if (pcap_findalldevs(&alldevs, errBuf) == 0) {
-    int i = 0;
+    printf("device:%s\n", dev);
     for (; alldevs != NULL; alldevs = alldevs->next) {
       if (strcmp(alldevs->name, dev) == 0) {
-        printf("device:%d name:%s description:%s\n", ++i, alldevs->name, alldevs->description);
-
-        bpf_u_int32 netp; //ip
-        bpf_u_int32 maskp; //subnet mask
-        int ret; //return code
-        ret = pcap_lookupnet(dev, &netp, &maskp, errBuf);
-        if (ret == -1) {
-          printf("error:%d\n", ret);
-          exit(ret);
-        }
-        call(alldevs->name, errBuf, exp, callback);
+        found = 0;
       }
     }
+  }
+  if (found == -1) {
+    printf("Not found device:%s\n", dev);
+    exit(-1);
+  } else {
+    bpf_u_int32 netp; //ip
+    bpf_u_int32 maskp; //subnet mask
+    int ret; //return code
+    ret = pcap_lookupnet(dev, &netp, &maskp, errBuf);
+    if (ret == -1) {
+      printf("error:%d\n", ret);
+      exit(ret);
+    }
+    call(errBuf, dev, exp, callback);
   }
 }
 
@@ -125,7 +126,7 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
   printf("\n\n");
 }
 
-void net_demo(const char *src_ip_str, const char *dev) {
+void net_demo(char *src_ip_str, char *dev) {
   libnet_t *net_t = NULL;
   char err_buf[LIBNET_ERRBUF_SIZE];
   libnet_ptag_t p_tag;
