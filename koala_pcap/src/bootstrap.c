@@ -13,7 +13,7 @@
 extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
 extern void call(char *errBuf, char *devStr, char *exp, pcap_handler callback);
 extern void* pthread_run(void*);
-extern void net_demo(char *src_ip_str, char *dst_ip_str, u_short src_prt, u_short dst_prt, char *packet);
+extern void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, char *payload);
 extern int check(char *errbuf, char *dev);
 
 int main(int argc, char **argv) {
@@ -147,17 +147,15 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
   tcp = (struct sniff_tcp*) (packet + SIZE_ETHERNET + size_ip);
   size_tcp = TH_OFF(tcp)*4;
   printf("src:%s:%d\n", inet_ntoa(ip->ip_src), ntohs(tcp->th_sport));
-  printf("dst:%s%s:%d\n", inet_ntoa(ip->ip_dst), ntohs(tcp->th_dport));
+  printf("dst:%s:%d\n", inet_ntoa(ip->ip_dst), ntohs(tcp->th_dport));
 
   //send packet
   char payload[4] = {0x01, 0x02, 0x03, 0x04};
-  net_demo(inet_ntoa(ip->ip_dst), inet_ntoa(ip->ip_src), ntohs(tcp->th_dport), ntohs(tcp->th_sport), payload);
+  send_msg(ethernet, ip, tcp, payload);
 }
 
-void net_demo(char *src_ip_str, char *dst_ip_str, uint16_t src_prt, uint16_t dst_prt, char *payload) {
+void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, char *payload) {
   u_int32_t payload_s = strlen(payload);
-
-
   libnet_t *net_t = NULL;
   char err_buf[LIBNET_ERRBUF_SIZE];
   libnet_ptag_t p_tag;
@@ -166,18 +164,17 @@ void net_demo(char *src_ip_str, char *dst_ip_str, uint16_t src_prt, uint16_t dst
   unsigned char dst_mac[MAC_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff}; //接收者网卡地址
 
   unsigned long src_ip, dst_ip = 0;
-  src_ip = libnet_name2addr4(net_t, src_ip_str, LIBNET_RESOLVE); //将字符串类型的ip转换为顺序网络字节流
-  dst_ip = libnet_name2addr4(net_t, dst_ip_str, LIBNET_RESOLVE);
+  src_ip = libnet_name2addr4(net_t, inet_ntoa(ip->ip_dst), LIBNET_RESOLVE); //将字符串类型的ip转换为顺序网络字节流
+  dst_ip = libnet_name2addr4(net_t, inet_ntoa(ip->ip_src), LIBNET_RESOLVE);
   net_t = libnet_init(LIBNET_LINK_ADV, NULL, err_buf); //初始化发送包结构
   if (net_t == NULL) {
     printf("libnet_init error\n");
     exit(0);
-  }
-
+  }  
   //TCP
   p_tag = libnet_build_tcp(
-      src_prt, /* source port */
-      dst_prt, /* destination port */
+      ntohs(tcp->th_dport), /* source port */
+      ntohs(tcp->th_sport), /* destination port */
       0x01010101, /* sequence number */
       0x02020202, /* acknowledgement num */
       TH_SYN, /* control flags */
@@ -192,7 +189,7 @@ void net_demo(char *src_ip_str, char *dst_ip_str, uint16_t src_prt, uint16_t dst
   if (p_tag == -1) {
     printf("libnet_build_tcp error");
     exit(0);
-  }
+  }  
   //IP
   p_tag = libnet_build_ipv4(
       LIBNET_IPV4_H + LIBNET_ICMPV4_ECHO_H + payload_s, /* length */
