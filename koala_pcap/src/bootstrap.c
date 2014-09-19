@@ -12,9 +12,9 @@
 
 extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
 extern void call(char *errBuf, char *devStr, char *exp, pcap_handler callback);
-extern void loop_dev(char *errBuf, char *dev, char *exp, pcap_handler callback);
 extern void* pthread_run(void*);
-extern void net_demo(char *src_ip_str, char *dev, char *packet);
+extern void net_demo(char *src_ip_str, char *dst_ip_str, char *dev, char *packet);
+extern int check(char *errbuf, char *dev);
 
 int main(int argc, char **argv) {
   pthread_t pid_a; //
@@ -24,24 +24,28 @@ int main(int argc, char **argv) {
   memset(p_a.dev, 0, sizeof (p_a.dev));
   memset(p_a.exp, 0, sizeof (p_a.exp));
 
+
   int ch;
+  int k = 0;
   opterr = 0;
-  while ((ch = getopt(argc, argv, "i:")) != EOF) {
+  while ((ch = getopt(argc, argv, "i:d:")) != EOF) {
     switch (ch) {
       case 'i':
         trim(optarg, p_a.dev);
         break;
+      case 'd':
+        p_a.dst = optarg;
+        break;
       default:
-        optind = argc - 1;
+        k = argc - 1;
     }
   }
 
-  if (optind >= argc - 1) {
+  if (k >= optind) {
     printf("Usage:command -i [device name] [expression]\n");
     exit(-1);
   }
 
-  int k = 0;
   for (k = optind; k < argc; k++) {
     strcat(p_a.exp, argv[k]);
     if (k < argc - 1) strcat(p_a.exp, " ");
@@ -75,38 +79,39 @@ void call(char *errBuf, char *devStr, char *exp, pcap_handler callback) {
   pcap_close(device);
 }
 
-void* pthread_run(void *arg) {
-  pdt_args_t p_a = *(pdt_args_t *) arg;
-  printf("dev:%s exp:%s\n", p_a.dev, p_a.exp);
-  loop_dev(p_a.errbuf, p_a.dev, p_a.exp, proc_packet);
-}
-
-void loop_dev(char *errBuf, char *dev, char *exp, pcap_handler callback) {
+int check(char *errbuf, char *dev) {
   pcap_if_t *alldevs;
-  int found = -1;
-  if (pcap_findalldevs(&alldevs, errBuf) == 0) {
+
+  if (pcap_findalldevs(&alldevs, errbuf) == 0) {
     printf("devices:[ ");
     for (; alldevs != NULL; alldevs = alldevs->next) {
       printf("%s ", alldevs->name);
       if (strcmp(alldevs->name, dev) == 0) {
-        found = 0;
+        return 0;
       }
     }
     puts("]");
   }
-  if (found == -1) {
-    printf("Not found device:%s\n", dev);
+  return -1;
+}
+
+void* pthread_run(void *arg) {
+  pdt_args_t p_a = *(pdt_args_t *) arg;
+  printf("dev:%s exp:%s\n", p_a.dev, p_a.exp);
+
+  if (check(p_a.errbuf, p_a.dev) != 0) {
+    printf("Not found device:%s\n", p_a.dev);
     exit(-1);
   } else {
     bpf_u_int32 netp; //ip
     bpf_u_int32 maskp; //subnet mask
     int ret; //return code
-    ret = pcap_lookupnet(dev, &netp, &maskp, errBuf);
+    ret = pcap_lookupnet(p_a.dev, &netp, &maskp, p_a.errbuf);
     if (ret == -1) {
       printf("error:%d\n", ret);
       exit(ret);
     }
-    call(errBuf, dev, exp, callback);
+    call(p_a.errbuf, p_a.dev, p_a.exp, proc_packet);
   }
 }
 
@@ -126,9 +131,20 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
     }
   }
   printf("\n\n");
+
+  //ADD
+  struct sniff_ethernet *ethernet; //以太网包头
+  struct sniff_ip *ip; //ip包头
+  struct sniff_tcp *tcp; //tcp包头
+
+  ethernet = (struct sniff_ethernet*) (packet);
+  ip = (struct sniff_ip*) (packet + sizeof (struct sniff_ethernet));
+  tcp = (struct sniff_tcp*) (packet + sizeof (struct sniff_ethernet) + sizeof (struct sniff_ip));
+  printf("From:%s\n", inet_ntoa(ip->ip_src));
+  printf("To:%s\n", inet_ntoa(ip->ip_dst));
 }
 
-void net_demo(char *src_ip_str, char *dev, char *packet) {
+void net_demo(char *src_ip_str, char *dst_ip_str, char *dev, char *packet) {
   libnet_t *net_t = NULL;
   char err_buf[LIBNET_ERRBUF_SIZE];
   libnet_ptag_t p_tag;
@@ -138,28 +154,22 @@ void net_demo(char *src_ip_str, char *dev, char *packet) {
 
   unsigned long src_ip, dst_ip = 0;
   src_ip = libnet_name2addr4(net_t, src_ip_str, LIBNET_RESOLVE); //将字符串类型的ip转换为顺序网络字节流
+  dst_ip = libnet_name2addr4(net_t, dst_ip_str, LIBNET_RESOLVE);
   net_t = libnet_init(LIBNET_LINK_ADV, dev, err_buf); //初始化发送包结构
   if (net_t == NULL) {
     printf("libnet_init error\n");
     exit(0);
   }
-  //char packet[] = {0x01, 0x02, 0x03, 0x04};
-  libnet_write_link(net_t, packet, 4);
-  p_tag = libnet_build_arp(
-      ARPHRD_ETHER, //hardware type ethernet
-      ETHERTYPE_IP, //protocol type
-      MAC_ADDR_LEN, //mac length
-      IP_ADDR_LEN, //protocol length
-      ARPOP_REPLY, //op type
-      (u_int8_t *) src_mac, //source mac addr这里的作用是更新目的地的arp表
-      (u_int8_t *) & src_ip, //source ip addr
-      (u_int8_t *) dst_mac, //dest mac addr
-      (u_int8_t *) & dst_ip, //dest ip addr
-      NULL, //payload
-      0, //payload length
-      net_t, //libnet context
-      0//0 stands to build a new one
-      );
+  p_tag = libnet_build_icmpv4_echo(
+      ICMP_ECHO, /* type */
+      0, /* code */
+      0, /* checksum */
+      0x42, /* id */
+      0x42, /* sequence number */
+      NULL, /* payload */
+      0, /* payload size */
+      net_t, /* libnet handle */
+      0);
   if (-1 == p_tag) {
     printf("libnet_build_arp error");
     exit(0);
@@ -178,12 +188,13 @@ void net_demo(char *src_ip_str, char *dev, char *packet) {
 
   if (-1 == p_tag) {
     printf("libnet_build_ethernet error!\n");
-    exit(1);
+    exit(-1);
   }
   int res;
   if (-1 == (res = libnet_write(net_t))) {
     printf("libnet_write error!\n");
     exit(1);
   }
+
   libnet_destroy(net_t);
 }
