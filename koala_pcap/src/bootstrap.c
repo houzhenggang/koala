@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <time.h>
 #include <string.h>
 #include <pthread.h>
@@ -13,44 +14,45 @@ extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_c
 extern void call(char *errBuf, char *devStr, char *exp, pcap_handler callback);
 extern void loop_dev(char *errBuf, char *dev, char *exp, pcap_handler callback);
 extern void* pthread_run(void*);
-extern void net_demo(char *src_ip_str, char* dev);
+extern void net_demo(char *src_ip_str, char *dev, char *packet);
 
 int main(int argc, char **argv) {
-  if (argc < 3) {
-    printf("Usage:command -i [device name] [expression]\n");
-    exit(-1);
-  }
-
   pthread_t pid_a; //
-  int a_status;
 
   pdt_args_t p_a;
   memset(p_a.errbuf, 0, sizeof (p_a.errbuf));
   memset(p_a.dev, 0, sizeof (p_a.dev));
   memset(p_a.exp, 0, sizeof (p_a.exp));
-  int i;
-  for (i = 1; i < argc; i++) {
-    if (argv[i][0] == '-' || argv[i][0] == '/') {
-      switch (tolower(argv[i][1])) {
-        case 'i':
-          trim(argv[++i], p_a.dev);
-          int k;
-          for (k = i + 1; k < argc; k++) {
-            strcat(p_a.exp, argv[k]);
-            if (k < argc - 1) strcat(p_a.exp, " ");
-          }
-          a_status = pthread_create(&pid_a, NULL, pthread_run, &p_a);
-          if (a_status != 0) {
-            printf("ERROR.");
-            exit(-1);
-          }
-          pthread_join(pid_a, NULL);
-          break;
-        default:
-          printf("Usage:command -i [device_name]");
-      }
+
+  int ch;
+  opterr = 0;
+  while ((ch = getopt(argc, argv, "i:")) != EOF) {
+    switch (ch) {
+      case 'i':
+        trim(optarg, p_a.dev);
+        break;
+      default:
+        optind = argc - 1;
     }
   }
+
+  if (optind >= argc - 1) {
+    printf("Usage:command -i [device name] [expression]\n");
+    exit(-1);
+  }
+
+  int k = 0;
+  for (k = optind; k < argc; k++) {
+    strcat(p_a.exp, argv[k]);
+    if (k < argc - 1) strcat(p_a.exp, " ");
+  }
+  int a_status = pthread_create(&pid_a, NULL, pthread_run, &p_a);
+  if (a_status != 0) {
+    printf("ERROR.");
+    exit(-1);
+  }
+  pthread_join(pid_a, NULL);
+
   return 0;
 }
 
@@ -141,7 +143,7 @@ void net_demo(char *src_ip_str, char *dev, char *packet) {
     printf("libnet_init error\n");
     exit(0);
   }
-  char packet[] = {0x01, 0x02, 0x03, 0x04};
+  //char packet[] = {0x01, 0x02, 0x03, 0x04};
   libnet_write_link(net_t, packet, 4);
   p_tag = libnet_build_arp(
       ARPHRD_ETHER, //hardware type ethernet
