@@ -13,7 +13,7 @@
 extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
 extern void call(char *errBuf, char *devStr, char *exp, pcap_handler callback);
 extern void* pthread_run(void*);
-extern void net_demo(char *src_ip_str, char *dst_ip_str, char *dev, char *packet);
+extern void net_demo(char *src_ip_str, char *dst_ip_str, u_short src_prt, u_short dst_prt, char *packet);
 extern int check(char *errbuf, char *dev);
 
 int main(int argc, char **argv) {
@@ -132,19 +132,32 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
   }
   printf("\n\n");
 
-  //ADD
+  //@todo add ethernet->ip->tcp->http process
   struct sniff_ethernet *ethernet; //以太网包头
   struct sniff_ip *ip; //ip包头
   struct sniff_tcp *tcp; //tcp包头
 
+  u_int size_ip;
+  u_int size_tcp;
+
   ethernet = (struct sniff_ethernet*) (packet);
-  ip = (struct sniff_ip*) (packet + sizeof (struct sniff_ethernet));
-  tcp = (struct sniff_tcp*) (packet + sizeof (struct sniff_ethernet) + sizeof (struct sniff_ip));
-  printf("From:%s\n", inet_ntoa(ip->ip_src));
-  printf("To:%s\n", inet_ntoa(ip->ip_dst));
+  ip = (struct sniff_ip*) (packet + SIZE_ETHERNET);
+  size_ip = IP_HL(ip)*4;
+  printf("ip length:%d\n", size_ip);
+  tcp = (struct sniff_tcp*) (packet + SIZE_ETHERNET + size_ip);
+  size_tcp = TH_OFF(tcp)*4;
+  printf("src:%s:%d\n", inet_ntoa(ip->ip_src), ntohs(tcp->th_sport));
+  printf("dst:%s%s:%d\n", inet_ntoa(ip->ip_dst), ntohs(tcp->th_dport));
+
+  //send packet
+  char payload[4] = {0x01, 0x02, 0x03, 0x04};
+  net_demo(inet_ntoa(ip->ip_dst), inet_ntoa(ip->ip_src), ntohs(tcp->th_dport), ntohs(tcp->th_sport), payload);
 }
 
-void net_demo(char *src_ip_str, char *dst_ip_str, char *dev, char *packet) {
+void net_demo(char *src_ip_str, char *dst_ip_str, uint16_t src_prt, uint16_t dst_prt, char *payload) {
+  u_int32_t payload_s = strlen(payload);
+
+
   libnet_t *net_t = NULL;
   char err_buf[LIBNET_ERRBUF_SIZE];
   libnet_ptag_t p_tag;
@@ -155,27 +168,51 @@ void net_demo(char *src_ip_str, char *dst_ip_str, char *dev, char *packet) {
   unsigned long src_ip, dst_ip = 0;
   src_ip = libnet_name2addr4(net_t, src_ip_str, LIBNET_RESOLVE); //将字符串类型的ip转换为顺序网络字节流
   dst_ip = libnet_name2addr4(net_t, dst_ip_str, LIBNET_RESOLVE);
-  net_t = libnet_init(LIBNET_LINK_ADV, dev, err_buf); //初始化发送包结构
+  net_t = libnet_init(LIBNET_LINK_ADV, NULL, err_buf); //初始化发送包结构
   if (net_t == NULL) {
     printf("libnet_init error\n");
     exit(0);
   }
-  p_tag = libnet_build_icmpv4_echo(
-      ICMP_ECHO, /* type */
-      0, /* code */
+
+  //TCP
+  p_tag = libnet_build_tcp(
+      src_prt, /* source port */
+      dst_prt, /* destination port */
+      0x01010101, /* sequence number */
+      0x02020202, /* acknowledgement num */
+      TH_SYN, /* control flags */
+      32767, /* window size */
       0, /* checksum */
-      0x42, /* id */
-      0x42, /* sequence number */
+      10, /* urgent pointer */
+      LIBNET_TCP_H + 20 + payload_s, /* TCP packet size */
+      (uint8_t*) payload, /* payload */
+      payload_s, /* payload size */
+      net_t, /* libnet handle */
+      0); /* libnet id */
+  if (p_tag == -1) {
+    printf("libnet_build_tcp error");
+    exit(0);
+  }
+  //IP
+  p_tag = libnet_build_ipv4(
+      LIBNET_IPV4_H + LIBNET_ICMPV4_ECHO_H + payload_s, /* length */
+      0, /* TOS */
+      0x42, /* IP ID */
+      0, /* IP Frag */
+      64, /* TTL */
+      IPPROTO_TCP, /* protocol */
+      0, /* checksum */
+      src_ip, /* source IP */
+      dst_ip, /* destination IP */
       NULL, /* payload */
       0, /* payload size */
       net_t, /* libnet handle */
       0);
-  if (-1 == p_tag) {
-    printf("libnet_build_arp error");
+  if (p_tag == -1) {
+    printf("libnet_build_ipv4 error");
     exit(0);
   }
-
-  //以太网头部
+  //Ethernet
   p_tag = libnet_build_ethernet(//create ethernet header
       (u_int8_t *) dst_mac, //dest mac addr
       (u_int8_t *) src_mac, //source mac addr
@@ -186,12 +223,11 @@ void net_demo(char *src_ip_str, char *dst_ip_str, char *dev, char *packet) {
       0//0 to build a new one
       );
 
-  if (-1 == p_tag) {
+  if (p_tag == -1) {
     printf("libnet_build_ethernet error!\n");
     exit(-1);
   }
-  int res;
-  if (-1 == (res = libnet_write(net_t))) {
+  if (libnet_write(net_t) == -1) {
     printf("libnet_write error!\n");
     exit(1);
   }
