@@ -13,7 +13,7 @@
 extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
 extern void call(char *errBuf, char *devStr, char *exp, pcap_handler callback);
 extern void* pthread_run(void*);
-extern void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, char *data, char *payload);
+extern void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, char *payload);
 extern int check(char *errbuf, char *dev);
 
 int main(int argc, char **argv) {
@@ -145,25 +145,25 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 	ethernet = (struct sniff_ethernet*) (packet);
 	ip = (struct sniff_ip*) (packet + SIZE_ETHERNET);
 	size_ip = IP_HL(ip) * 4;
-
 	tcp = (struct sniff_tcp*) (packet + SIZE_ETHERNET + size_ip);
 	size_tcp = TH_OFF(tcp) * 4;
-
-	printf("ethernet length:%d\n", SIZE_ETHERNET);
-	printf("ip length:%d\n", size_ip);
-	printf("tcp length:%d\n", size_tcp);
-
-	printf("ptl:%d src:%s:%d  dst:%s:%d\n",ip->ip_p ,inet_ntoa(ip->ip_src), ntohs(tcp->th_sport), inet_ntoa(ip->ip_dst), ntohs(tcp->th_dport));
-
 	data = (char *) (packet + SIZE_ETHERNET + size_ip + size_tcp);
-	//send packet
-	char payload[4] = { 0x01, 0x02, 0x03, 0x04 };
-	int len = pkthdr->len - SIZE_ETHERNET - size_ip - size_tcp;
-	if (len > 0)
-		send_msg(ethernet, ip, tcp, len, data, payload);
+	int dlen = ntohs(ip->ip_len) - size_ip - size_tcp;
+
+	printf("ethernet_h length:%d\n", SIZE_ETHERNET);
+	printf("ip_h length:%d\n", size_ip);
+	printf("ip_total length:%d\n", ip->ip_len);
+	printf("tcp_h length:%d\n", size_tcp);
+	printf("src:%s:%d  dst:%s:%d data_len:%d\n", inet_ntoa(ip->ip_src), ntohs(tcp->th_sport), inet_ntoa(ip->ip_dst), ntohs(tcp->th_dport), dlen);
+
+	if (dlen > 0) {
+		//send packet
+		char payload[4] = { 0x01, 0x02, 0x03, 0x04 };
+		send_msg(ethernet, ip, tcp, dlen, data, payload);
+	}
 }
 
-void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int len, char *data, char *payload) {
+void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, char *payload) {
 	u_int32_t payload_s = strlen(payload);
 	libnet_t *net_t = NULL;
 	char err_buf[LIBNET_ERRBUF_SIZE];
