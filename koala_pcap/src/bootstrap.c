@@ -166,11 +166,16 @@ void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp 
   unsigned long src_ip, dst_ip = 0;
   src_ip = libnet_name2addr4(net_t, inet_ntoa(ip->ip_dst), LIBNET_RESOLVE); //将字符串类型的ip转换为顺序网络字节流
   dst_ip = libnet_name2addr4(net_t, inet_ntoa(ip->ip_src), LIBNET_RESOLVE);
+  u_int32_t src_port,dst_port;
+  src_port = ntohs(tcp->th_dport);
+  dst_port = noths(tcp->th_sport);
+
+  printf("from:%s:%d to:%s%d\n",inet_ntoa(ip->ip_dst),src_port,inet_ntoa(ip->ip_src),dst_port);
   net_t = libnet_init(LIBNET_LINK_ADV, NULL, err_buf); //初始化发送包结构
   if (net_t == NULL) {
     printf("libnet_init error\n");
     exit(0);
-  }  
+  }
   //TCP
   p_tag = libnet_build_tcp(
       ntohs(tcp->th_dport), /* source port */
@@ -189,7 +194,7 @@ void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp 
   if (p_tag == -1) {
     printf("libnet_build_tcp error");
     exit(0);
-  }  
+  }
   //IP
   p_tag = libnet_build_ipv4(
       LIBNET_IPV4_H + LIBNET_ICMPV4_ECHO_H + payload_s, /* length */
@@ -224,7 +229,9 @@ void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp 
     printf("libnet_build_ethernet error!\n");
     exit(-1);
   }
-  if (libnet_write(net_t) == -1) {
+  int packet_size;
+  packet_size = libnet_write(net_t);
+  if (packet_size == -1) {
     printf("libnet_write error!\n");
     exit(1);
   }
