@@ -81,18 +81,18 @@ void call(char *errBuf, char *devStr, char *exp, pcap_handler callback) {
 
 int check(char *errbuf, char *dev) {
 	pcap_if_t *alldevs;
-
+	int flag = -1;
 	if (pcap_findalldevs(&alldevs, errbuf) == 0) {
 		printf("devices:[ ");
 		for (; alldevs != NULL; alldevs = alldevs->next) {
 			printf("%s ", alldevs->name);
 			if (strcmp(alldevs->name, dev) == 0) {
-				return 0;
+				flag = 0;
 			}
 		}
-		puts("]");
+		printf("]\n");
 	}
-	return -1;
+	return flag;
 }
 
 void* pthread_run(void *arg) {
@@ -143,23 +143,44 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 	u_int size_tcp;
 
 	ethernet = (struct sniff_ethernet*) (packet);
-	ip = (struct sniff_ip*) (packet + SIZE_ETHERNET);
-	size_ip = IP_HL(ip) * 4;
-	tcp = (struct sniff_tcp*) (packet + SIZE_ETHERNET + size_ip);
-	size_tcp = TH_OFF(tcp) * 4;
-	data = (char *) (packet + SIZE_ETHERNET + size_ip + size_tcp);
-	int dlen = ntohs(ip->ip_len) - size_ip - size_tcp;
+	switch (ntohs(ethernet->ether_type)) {
+		case ETHERTYPE_ARP:
+			printf("ARP\n");
+			break;
+		case ETHERTYPE_IP:
+			ip = (struct sniff_ip*) (packet + SIZE_ETHERNET);
+			switch (ip->ip_p) {
+				case IPPROTO_TCP:
+					size_ip = IP_HL(ip) * 4;
+					tcp = (struct sniff_tcp*) (packet + SIZE_ETHERNET + size_ip);
+					size_tcp = TH_OFF(tcp) * 4;
+					data = (char *) (packet + SIZE_ETHERNET + size_ip + size_tcp);
+					int dlen = ntohs(ip->ip_len) - size_ip - size_tcp;
 
-	printf("ethernet_h length:%d\n", SIZE_ETHERNET);
-	printf("ip_h length:%d\n", size_ip);
-	printf("ip_total length:%d\n", ip->ip_len);
-	printf("tcp_h length:%d\n", size_tcp);
-	printf("src:%s:%d  dst:%s:%d data_len:%d\n", inet_ntoa(ip->ip_src), ntohs(tcp->th_sport), inet_ntoa(ip->ip_dst), ntohs(tcp->th_dport), dlen);
+					printf("ethernet_h length:%d\n", SIZE_ETHERNET);
+					printf("ip_h length:%d\n", size_ip);
+					printf("ip_total length:%d\n", ntohs(ip->ip_len));
+					printf("tcp_h length:%d\n", size_tcp);
+					printf("src:%s:%d  dst:%s:%d data_len:%d\n", inet_ntoa(ip->ip_src), ntohs(tcp->th_sport), inet_ntoa(ip->ip_dst), ntohs(tcp->th_dport), dlen);
 
-	if (dlen > 0) {
-		//send packet
-		char payload[4] = { 0x01, 0x02, 0x03, 0x04 };
-		send_msg(ethernet, ip, tcp, dlen, data, payload);
+					if (dlen > 0) {
+						//send packet
+						char payload[4] = { 0x01, 0x02, 0x03, 0x04 };
+						send_msg(ethernet, ip, tcp, dlen, data, payload);
+					}
+					break;
+				case IPPROTO_UDP:
+					break;
+				case IPPROTO_ICMP:
+					break;
+				case IPPROTO_IP:
+					break;
+				default:
+					printf("Unkown Protocol:%d\n", ip->ip_p);
+			}
+			break;
+		default:
+			printf("Unkown Type:%d\n", ethernet->ether_type);
 	}
 }
 
@@ -178,7 +199,7 @@ void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp 
 	p0x_u_char(6, src_mac);
 	printf("dst_mac:");
 	p0x_u_char(6, dst_mac);
-	printf("\n\n");
+	printf("\n");
 
 	u_int32_t src_ip, dst_ip = 0;
 	u_char src_ip_addr[16];
@@ -191,8 +212,9 @@ void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp 
 	u_int32_t src_port, dst_port;
 	src_port = ntohs(tcp->th_dport);
 	dst_port = ntohs(tcp->th_sport);
-
+	printf("##########################\n");
 	printf("send from:%s:%d to:%s:%d\n", src_ip_addr, src_port, dst_ip_addr, dst_port);
+	printf("##########################\n");
 	net_t = libnet_init(LIBNET_LINK_ADV, NULL, err_buf); //初始化发送包结构
 	if (net_t == NULL) {
 		printf("libnet_init error\n");
