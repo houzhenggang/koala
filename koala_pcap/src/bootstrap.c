@@ -14,14 +14,13 @@
 extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
 extern void call(pcap_handler callback);
 extern void* pthread_run(void*);
-extern int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, u_int32_t payload_s, char *payload);
-int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_t dst_port, u_int32_t payload_s, char *payload);
+extern int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_t dst_port, u_int32_t seq, u_int32_t ack, u_int32_t payload_s, char *payload);
 extern int check(char *errbuf, char *dev);
-
+//
 static pdt_args_t pat;
 static libnet_t *net_t = NULL;
 static libnet_ptag_t p_tag;
-
+static char payload[4] = { 0x01, 0x02, 0x03, 0x04 };
 int main(int argc, char **argv) {
 	pthread_t pid_a; //
 
@@ -156,23 +155,17 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 					data = (char *) (packet + SIZE_ETHERNET + size_ip + size_tcp);
 					dlen = ntohs(iphdr->ip_len) - size_ip - size_tcp;
 
-					if (dlen > 0) {
-						//send packet
-						char payload[4] = { 0x01, 0x02, 0x03, 0x04 };
+					u_int32_t src_port, dst_port;
+					src_port = ntohs(tcphdr->th_dport);
+					dst_port = ntohs(tcphdr->th_sport);
 
-						//time
-						ftime(&timebuffer1);
-						time1 = timebuffer1.time;
-						millitm1 = timebuffer1.millitm;
-						//time
-						send_msg(ethhdr, iphdr, tcphdr, dlen, data, 4, payload);
-
-						//time
-						ftime(&timebuffer2);
-						time2 = timebuffer2.time;
-						millitm2 = timebuffer2.millitm;
-						printf("time use:%d\n", (millitm2 - millitm1));
-						//time
+					if ((tcphdr->th_flags & (TH_ACK | TH_SYN) == (TH_ACK | TH_SYN)) && (tcphdr->th_flags & TH_RST) != TH_RST) {
+						send_packet(iphdr->ip_dst.s_addr, src_port, iphdr->ip_src.s_addr, dst_port, ntohl(tcphdr->th_seq), ntohl(tcphdr->th_ack), 4, payload);
+						send_packet(iphdr->ip_src.s_addr, dst_port, iphdr->ip_dst.s_addr, src_port, ntohl(tcphdr->th_ack), ntohl(tcphdr->th_seq), 4, payload);
+						u_char src_ip_addr[16], dst_ip_addr[16];
+						strcpy(src_ip_addr, inet_ntoa(iphdr->ip_src));
+						strcpy(dst_ip_addr, inet_ntoa(iphdr->ip_dst));
+						printf("RST: %s<->%s\n", src_ip_addr, dst_ip_addr);
 					}
 					/*
 					 printf("ethernet_h length:%d\n", SIZE_ETHERNET);
@@ -181,7 +174,6 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 					 printf("tcp_h length:%d\n", size_tcp);
 					 printf("src:%s:%d  dst:%s:%d data_len:%d\n", inet_ntoa(iphdr->ip_src), ntohs(tcphdr->th_sport), inet_ntoa(iphdr->ip_dst), ntohs(tcphdr->th_dport), dlen);
 					 */
-
 					break;
 				case IPPROTO_UDP:
 					break;
@@ -214,63 +206,21 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 
 }
 
-int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, u_int32_t payload_s, char *payload) {
-	/**
-	 u_char src_mac[ETHER_ADDR_LEN]; //发送者网卡地址
-	 u_char dst_mac[ETHER_ADDR_LEN]; //接收者网卡地址
-
-	 strcpy(src_mac, eth->ether_dhost);
-	 strcpy(dst_mac, eth->ether_shost);
-
-	 u_char src_ip_addr[16];
-	 u_char dst_ip_addr[16];
-	 strcpy(src_ip_addr, inet_ntoa(ip->ip_dst));
-	 strcpy(dst_ip_addr, inet_ntoa(ip->ip_src));
-	 */
-	u_int32_t src_port, dst_port;
-	src_port = ntohs(tcp->th_dport);
-	dst_port = ntohs(tcp->th_sport);
-	if (ip->ip_ttl != 111) {
-		send_packet(ip->ip_dst.s_addr, src_port, ip->ip_src.s_addr, dst_port, payload_s, payload);
-		send_packet(ip->ip_src.s_addr, dst_port, ip->ip_dst.s_addr, src_port, payload_s, payload);
-	}
-
-	/*
-	 printf("src_mac:");
-	 p0x_u_char(6, src_mac);
-	 printf("dst_mac:");
-	 p0x_u_char(6, dst_mac);
-	 printf("\n");
-
-	 printf("##########################\n");
-	 printf("%s:%d<->%s:%d RST\n", src_ip_addr, src_port, dst_ip_addr, dst_port);
-	 printf("##########################\n");
-	 */
-}
-
-int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_t dst_port, u_int32_t payload_s, char *payload) {
-
-	/*
-	 u_int32_t src_ip, dst_ip = 0;
-
-	 src_ip = libnet_name2addr4(net_t, src_ip_addr, LIBNET_RESOLVE); //将字符串类型的ip转换为顺序网络字节流
-	 dst_ip = libnet_name2addr4(net_t, dst_ip_addr, LIBNET_RESOLVE);
-	 */
-
+int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_t dst_port, u_int32_t seq, u_int32_t ack, u_int32_t payload_s, char *payload) {
 	libnet_clear_packet(net_t);
 	//TCP
 	p_tag = libnet_build_tcp(
 			src_port,
 			dst_port,
-			0x01010101,
-			0x02020202,
+			seq,
+			ack,
 			TH_RST | TH_ACK,
 			0,
 			0,
 			0,
 			LIBNET_TCP_H + payload_s, //LIBNET_TCP_H +  payload_s,
-			payload, //payload
-			payload_s, //payload_s
+			NULL, //payload
+			0, //payload_s
 			net_t,
 			0);
 	if (p_tag == -1) {
