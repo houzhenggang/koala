@@ -14,6 +14,7 @@ extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_c
 extern void call(pcap_handler callback);
 extern void* pthread_run(void*);
 extern int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, u_int32_t payload_s, char *payload);
+int send_packet(char *src_ip_addr, u_int16_t src_port, char *dst_ip_addr, u_int16_t dst_port, u_int32_t payload_s, char *payload);
 extern int check(char *errbuf, char *dev);
 static pdt_args_t pat; //
 
@@ -163,7 +164,7 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 					if (dlen > 0) {
 						//send packet
 						char payload[4] = { 0x01, 0x02, 0x03, 0x04 };
-						send_msg(ethernet, ip, tcp, dlen, data, 4, payload);
+
 					}
 					break;
 				case IPPROTO_UDP:
@@ -182,9 +183,6 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 }
 
 int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, u_int32_t payload_s, char *payload) {
-	libnet_t *net_t = NULL;
-	libnet_ptag_t p_tag;
-
 	u_char src_mac[ETHER_ADDR_LEN]; //发送者网卡地址
 	u_char dst_mac[ETHER_ADDR_LEN]; //接收者网卡地址
 
@@ -196,26 +194,35 @@ int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *
 	p0x_u_char(6, dst_mac);
 	printf("\n");
 
-	u_int32_t src_ip, dst_ip = 0;
 	u_char src_ip_addr[16];
 	u_char dst_ip_addr[16];
 	strcpy(src_ip_addr, inet_ntoa(ip->ip_dst));
 	strcpy(dst_ip_addr, inet_ntoa(ip->ip_src));
 
-	src_ip = libnet_name2addr4(net_t, src_ip_addr, LIBNET_RESOLVE); //将字符串类型的ip转换为顺序网络字节流
-	dst_ip = libnet_name2addr4(net_t, dst_ip_addr, LIBNET_RESOLVE);
 	u_int32_t src_port, dst_port;
 	src_port = ntohs(tcp->th_dport);
 	dst_port = ntohs(tcp->th_sport);
 	printf("##########################\n");
-	printf("send from:%s:%d to:%s:%d\n", src_ip_addr, src_port, dst_ip_addr, dst_port);
+	printf("%s:%d<->%s:%d RST\n", src_ip_addr, src_port, dst_ip_addr, dst_port);
 	printf("##########################\n");
+	send_packet(src_ip_addr, src_port, dst_ip_addr, dst_port, payload_s, payload);
+	send_packet(dst_ip_addr, dst_port, src_ip_addr, src_port, payload_s, payload);
+}
+
+int send_packet(char *src_ip_addr, u_int16_t src_port, char *dst_ip_addr, u_int16_t dst_port, u_int32_t payload_s, char *payload) {
+	libnet_t *net_t = NULL;
+	libnet_ptag_t p_tag;
+
+	u_int32_t src_ip, dst_ip = 0;
+
+	src_ip = libnet_name2addr4(net_t, src_ip_addr, LIBNET_RESOLVE); //将字符串类型的ip转换为顺序网络字节流
+	dst_ip = libnet_name2addr4(net_t, dst_ip_addr, LIBNET_RESOLVE);
+
 	net_t = libnet_init(LIBNET_RAW4, pat.out_dev, pat.errbuf); //初始化发送包结构
 	if (net_t == NULL) {
 		printf("libnet_init error\n");
 		return -1;
 	}
-
 	//TCP
 	p_tag = libnet_build_tcp(
 			src_port,
