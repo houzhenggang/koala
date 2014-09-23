@@ -36,15 +36,13 @@ int main(int argc, char **argv) {
 				trim(optarg, pat.out_dev);
 				break;
 			default:
-				k = argc - 1;
+				break;
 		}
 	}
-
-	if (k >= optind) {
+	if (strlen(pat.in_dev) < 1) {
 		printf("Usage:command -i [listen device name] -o [send packet device name] [expression]\n");
 		exit(-1);
 	}
-
 	for (k = optind; k < argc; k++) {
 		strcat(pat.exp, argv[k]);
 		if (k < argc - 1)
@@ -102,17 +100,16 @@ void* pthread_run(void *arg) {
 	if (check(pat.errbuf, pat.in_dev) != 0) {
 		printf("Not found device:%s\n", pat.in_dev);
 		exit(-1);
-	} else {
-		bpf_u_int32 netp; //ip
-		bpf_u_int32 maskp; //subnet mask
-		int ret; //return code
-		ret = pcap_lookupnet(pat.in_dev, &netp, &maskp, pat.errbuf);
-		if (ret == -1) {
-			printf("error:%d\n", ret);
-			exit(ret);
-		}
-		call(proc_packet);
 	}
+	bpf_u_int32 netp; //ip
+	bpf_u_int32 maskp; //subnet mask
+	int ret; //return code
+	ret = pcap_lookupnet(pat.in_dev, &netp, &maskp, pat.errbuf);
+	if (ret == -1) {
+		printf("error:%d\n", ret);
+		exit(-1);
+	}
+	call(proc_packet);
 }
 
 void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet) {
@@ -213,19 +210,9 @@ int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *
 	printf("##########################\n");
 	printf("send from:%s:%d to:%s:%d\n", src_ip_addr, src_port, dst_ip_addr, dst_port);
 	printf("##########################\n");
-	net_t = libnet_init(LIBNET_LINK_ADV, pat.out_dev, pat.errbuf); //初始化发送包结构
+	net_t = libnet_init(LIBNET_RAW4, pat.out_dev, pat.errbuf); //初始化发送包结构
 	if (net_t == NULL) {
 		printf("libnet_init error\n");
-		return -1;
-	}
-
-	p_tag = libnet_build_tcp_options(
-			(uint8_t*) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000",
-			20,
-			net_t,
-			0);
-	if (p_tag == -1) {
-		fprintf(stderr, "Can't build TCP options: %s\n", libnet_geterror(net_t));
 		return -1;
 	}
 
@@ -235,17 +222,17 @@ int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *
 			dst_port,
 			0x01010101,
 			0x02020202,
-			TH_RST | TH_FIN,
+			TH_RST,
 			0,
 			0,
 			0,
-			LIBNET_TCP_H, //LIBNET_TCP_H + 20 + payload_s,
-			NULL, //payload
-			0, //payload_s
+			LIBNET_TCP_H + payload_s, //LIBNET_TCP_H +  payload_s,
+			payload, //payload
+			payload_s, //payload_s
 			net_t,
 			0);
 	if (p_tag == -1) {
-		printf("libnet_build_tcp error");
+		printf("libnet_build_tcp error:%s\n", libnet_geterror(net_t));
 		return -1;
 	}
 	//IP
@@ -255,7 +242,7 @@ int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *
 			0, /* TOS */
 			(u_short) libnet_get_prand(LIBNET_PRu16), /* id,随机产生0~65535 */
 			0, /* IP Frag */
-			62, /* TTL */
+			111, /* TTL */
 			IPPROTO_TCP, /* protocol */
 			0, /* checksum */
 			src_ip, /* source IP */
@@ -265,7 +252,7 @@ int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *
 			net_t, /* libnet handle */
 			0);
 	if (p_tag == -1) {
-		printf("libnet_build_ipv4 error");
+		printf("libnet_build_ipv4 error:%s\n", libnet_geterror(net_t));
 		return -1;
 	}
 	//Ethernet
@@ -279,7 +266,7 @@ int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *
 			0 //0 to build a new one
 			);
 	if (p_tag == -1) {
-		printf("libnet_build_ethernet error!\n");
+		printf("libnet_build_ethernet error:%s\n", libnet_geterror(net_t));
 		return -1;
 	}
 	int packet_size;
