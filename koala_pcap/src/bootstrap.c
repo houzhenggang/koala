@@ -11,29 +11,29 @@
 #include "yf_trim.h"
 
 extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
-extern void call(char *errBuf, char *devStr, char *exp, pcap_handler callback);
+extern void call(pcap_handler callback);
 extern void* pthread_run(void*);
 extern void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, char *payload);
 extern int check(char *errbuf, char *dev);
+static pdt_args_t pat; //
 
 int main(int argc, char **argv) {
 	pthread_t pid_a; //
 
-	pdt_args_t p_a;
-	memset(p_a.errbuf, 0, sizeof(p_a.errbuf));
-	memset(p_a.dev, 0, sizeof(p_a.dev));
-	memset(p_a.exp, 0, sizeof(p_a.exp));
+	memset(pat.errbuf, 0, sizeof(pat.errbuf));
+	memset(pat.in_dev, 0, sizeof(pat.in_dev));
+	memset(pat.exp, 0, sizeof(pat.exp));
 
 	int ch;
 	int k = 0;
 	opterr = 0;
-	while ((ch = getopt(argc, argv, "i:d:")) != EOF) {
+	while ((ch = getopt(argc, argv, "i:o:")) != EOF) {
 		switch (ch) {
 			case 'i':
-				trim(optarg, p_a.dev);
+				trim(optarg, pat.in_dev);
 				break;
-			case 'd':
-				p_a.dst = optarg;
+			case 'o':
+				trim(optarg, pat.out_dev);
 				break;
 			default:
 				k = argc - 1;
@@ -41,16 +41,16 @@ int main(int argc, char **argv) {
 	}
 
 	if (k >= optind) {
-		printf("Usage:command -i [device name] [expression]\n");
+		printf("Usage:command -i [listen device name] -o [send packet device name] [expression]\n");
 		exit(-1);
 	}
 
 	for (k = optind; k < argc; k++) {
-		strcat(p_a.exp, argv[k]);
+		strcat(pat.exp, argv[k]);
 		if (k < argc - 1)
-			strcat(p_a.exp, " ");
+			strcat(pat.exp, " ");
 	}
-	int a_status = pthread_create(&pid_a, NULL, pthread_run, &p_a);
+	int a_status = pthread_create(&pid_a, NULL, pthread_run, &pat);
 	if (a_status != 0) {
 		printf("ERROR.");
 		exit(-1);
@@ -60,17 +60,17 @@ int main(int argc, char **argv) {
 	return 0;
 }
 
-void call(char *errBuf, char *devStr, char *exp, pcap_handler callback) {
+void call(pcap_handler callback) {
 	/* open a device, wait until a packet arrives */
-	pcap_t *device = pcap_open_live(devStr, 65535, 1, 0, errBuf);
+	pcap_t *device = pcap_open_live(pat.in_dev, 65535, 1, 0, pat.errbuf);
 
 	if (!device) {
-		printf("error: pcap_open_live(): %s\n", errBuf);
+		printf("error: pcap_open_live(): %s\n", pat.errbuf);
 		exit(1);
 	}
 
 	struct bpf_program filter;
-	pcap_compile(device, &filter, exp, 1, 0);
+	pcap_compile(device, &filter, pat.exp, 1, 0);
 	pcap_setfilter(device, &filter);
 
 	/* wait loop forever */
@@ -96,22 +96,22 @@ int check(char *errbuf, char *dev) {
 }
 
 void* pthread_run(void *arg) {
-	pdt_args_t p_a = *(pdt_args_t *) arg;
-	printf("dev:%s exp:%s\n", p_a.dev, p_a.exp);
+	pdt_args_t pat = *(pdt_args_t *) arg;
+	printf("dev:%s exp:%s\n", pat.in_dev, pat.exp);
 
-	if (check(p_a.errbuf, p_a.dev) != 0) {
-		printf("Not found device:%s\n", p_a.dev);
+	if (check(pat.errbuf, pat.in_dev) != 0) {
+		printf("Not found device:%s\n", pat.in_dev);
 		exit(-1);
 	} else {
 		bpf_u_int32 netp; //ip
 		bpf_u_int32 maskp; //subnet mask
 		int ret; //return code
-		ret = pcap_lookupnet(p_a.dev, &netp, &maskp, p_a.errbuf);
+		ret = pcap_lookupnet(pat.in_dev, &netp, &maskp, pat.errbuf);
 		if (ret == -1) {
 			printf("error:%d\n", ret);
 			exit(ret);
 		}
-		call(p_a.errbuf, p_a.dev, p_a.exp, proc_packet);
+		call(proc_packet);
 	}
 }
 
@@ -139,10 +139,10 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 	struct sniff_tcp *tcp; //tcp包头
 	char *data; //http packet
 
-	u_int size_ip;
-	u_int size_tcp;
+	u_int size_tcp, size_ip;
 
 	ethernet = (struct sniff_ethernet*) (packet);
+
 	switch (ntohs(ethernet->ether_type)) {
 		case ETHERTYPE_ARP:
 			printf("ARP\n");
@@ -215,7 +215,7 @@ void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp 
 	printf("##########################\n");
 	printf("send from:%s:%d to:%s:%d\n", src_ip_addr, src_port, dst_ip_addr, dst_port);
 	printf("##########################\n");
-	net_t = libnet_init(LIBNET_LINK_ADV, NULL, err_buf); //初始化发送包结构
+	net_t = libnet_init(LIBNET_LINK_ADV, pat.out_dev, err_buf); //初始化发送包结构
 	if (net_t == NULL) {
 		printf("libnet_init error\n");
 		return;

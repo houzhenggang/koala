@@ -105,9 +105,9 @@ struct sniff_dns {
 
 typedef struct pdt_args {
   char errbuf[PCAP_ERRBUF_SIZE];
-  char dev[PTHREAD_ARG_LEN];
+  char in_dev[PTHREAD_ARG_LEN];
+	char out_dev[PTHREAD_ARG_LEN];
   char exp[PTHREAD_ARG_LEN];
-  char *dst;
 } pdt_args_t;
 #endif	/* YF_PCAP_H */
 
