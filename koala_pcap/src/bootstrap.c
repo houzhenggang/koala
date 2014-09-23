@@ -15,9 +15,12 @@ extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_c
 extern void call(pcap_handler callback);
 extern void* pthread_run(void*);
 extern int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, u_int32_t payload_s, char *payload);
-int send_packet(char *src_ip_addr, u_int16_t src_port, char *dst_ip_addr, u_int16_t dst_port, u_int32_t payload_s, char *payload);
+int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_t dst_port, u_int32_t payload_s, char *payload);
 extern int check(char *errbuf, char *dev);
-static pdt_args_t pat; //
+
+static pdt_args_t pat;
+static libnet_t *net_t = NULL;
+static libnet_ptag_t p_tag;
 
 int main(int argc, char **argv) {
 	pthread_t pid_a; //
@@ -45,6 +48,13 @@ int main(int argc, char **argv) {
 		printf("Usage:command -i [listen device name] -o [send packet device name] [expression]\n");
 		exit(-1);
 	}
+	//初始化发送包结构
+	net_t = libnet_init(LIBNET_RAW4, pat.out_dev, pat.errbuf);
+	if (net_t == NULL) {
+		printf("libnet_init error\n");
+		return -1;
+	}
+
 	for (k = optind; k < argc; k++) {
 		strcat(pat.exp, argv[k]);
 		if (k < argc - 1)
@@ -205,24 +215,26 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 }
 
 int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, u_int32_t payload_s, char *payload) {
-	u_char src_mac[ETHER_ADDR_LEN]; //发送者网卡地址
-	u_char dst_mac[ETHER_ADDR_LEN]; //接收者网卡地址
+	/**
+	 u_char src_mac[ETHER_ADDR_LEN]; //发送者网卡地址
+	 u_char dst_mac[ETHER_ADDR_LEN]; //接收者网卡地址
 
-	strcpy(src_mac, eth->ether_dhost);
-	strcpy(dst_mac, eth->ether_shost);
+	 strcpy(src_mac, eth->ether_dhost);
+	 strcpy(dst_mac, eth->ether_shost);
 
-	u_char src_ip_addr[16];
-	u_char dst_ip_addr[16];
-	strcpy(src_ip_addr, inet_ntoa(ip->ip_dst));
-	strcpy(dst_ip_addr, inet_ntoa(ip->ip_src));
-
+	 u_char src_ip_addr[16];
+	 u_char dst_ip_addr[16];
+	 strcpy(src_ip_addr, inet_ntoa(ip->ip_dst));
+	 strcpy(dst_ip_addr, inet_ntoa(ip->ip_src));
+	 */
 	u_int32_t src_port, dst_port;
 	src_port = ntohs(tcp->th_dport);
 	dst_port = ntohs(tcp->th_sport);
 	if (ip->ip_ttl != 111) {
-		send_packet(src_ip_addr, src_port, dst_ip_addr, dst_port, payload_s, payload);
-		send_packet(dst_ip_addr, dst_port, src_ip_addr, src_port, payload_s, payload);
+		send_packet(ip->ip_dst.s_addr, src_port, ip->ip_src.s_addr, dst_port, payload_s, payload);
+		send_packet(ip->ip_src.s_addr, dst_port, ip->ip_dst.s_addr, src_port, payload_s, payload);
 	}
+
 	/*
 	 printf("src_mac:");
 	 p0x_u_char(6, src_mac);
@@ -236,20 +248,16 @@ int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *
 	 */
 }
 
-int send_packet(char *src_ip_addr, u_int16_t src_port, char *dst_ip_addr, u_int16_t dst_port, u_int32_t payload_s, char *payload) {
-	libnet_t *net_t = NULL;
-	libnet_ptag_t p_tag;
+int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_t dst_port, u_int32_t payload_s, char *payload) {
 
-	u_int32_t src_ip, dst_ip = 0;
+	/*
+	 u_int32_t src_ip, dst_ip = 0;
 
-	src_ip = libnet_name2addr4(net_t, src_ip_addr, LIBNET_RESOLVE); //将字符串类型的ip转换为顺序网络字节流
-	dst_ip = libnet_name2addr4(net_t, dst_ip_addr, LIBNET_RESOLVE);
+	 src_ip = libnet_name2addr4(net_t, src_ip_addr, LIBNET_RESOLVE); //将字符串类型的ip转换为顺序网络字节流
+	 dst_ip = libnet_name2addr4(net_t, dst_ip_addr, LIBNET_RESOLVE);
+	 */
 
-	net_t = libnet_init(LIBNET_RAW4, pat.out_dev, pat.errbuf); //初始化发送包结构
-	if (net_t == NULL) {
-		printf("libnet_init error\n");
-		return -1;
-	}
+	libnet_clear_packet(net_t);
 	//TCP
 	p_tag = libnet_build_tcp(
 			src_port,
@@ -293,5 +301,5 @@ int send_packet(char *src_ip_addr, u_int16_t src_port, char *dst_ip_addr, u_int1
 	int packet_size;
 	packet_size = libnet_write(net_t);
 	//printf("packet_size:%d\n", packet_size);
-	libnet_destroy(net_t);
+	//libnet_destroy(net_t);
 }
