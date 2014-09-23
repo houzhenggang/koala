@@ -255,20 +255,7 @@ int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *
 		printf("libnet_build_ipv4 error:%s\n", libnet_geterror(net_t));
 		return -1;
 	}
-	//Ethernet
-	p_tag = libnet_build_ethernet(
-			(u_int8_t *) dst_mac, //dest mac addr
-			(u_int8_t *) src_mac, //source mac addr
-			ETHERTYPE_IP, //protocol type
-			NULL, //payload
-			0, //payload length
-			net_t, //libnet context
-			0 //0 to build a new one
-			);
-	if (p_tag == -1) {
-		printf("libnet_build_ethernet error:%s\n", libnet_geterror(net_t));
-		return -1;
-	}
+
 	int packet_size;
 	packet_size = libnet_write(net_t);
 	printf("packet_size:%d\n", packet_size);
