@@ -13,7 +13,7 @@
 extern void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
 extern void call(pcap_handler callback);
 extern void* pthread_run(void*);
-extern void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, char *payload);
+extern int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, u_int32_t payload_s, char *payload);
 extern int check(char *errbuf, char *dev);
 static pdt_args_t pat; //
 
@@ -139,7 +139,7 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 	struct sniff_tcp *tcp; //tcp包头
 	char *data; //http packet
 
-	u_int size_tcp, size_ip;
+	u_int size_tcp, size_ip, dlen = 0;
 
 	ethernet = (struct sniff_ethernet*) (packet);
 
@@ -155,7 +155,7 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 					tcp = (struct sniff_tcp*) (packet + SIZE_ETHERNET + size_ip);
 					size_tcp = TH_OFF(tcp) * 4;
 					data = (char *) (packet + SIZE_ETHERNET + size_ip + size_tcp);
-					int dlen = ntohs(ip->ip_len) - size_ip - size_tcp;
+					dlen = ntohs(ip->ip_len) - size_ip - size_tcp;
 
 					printf("ethernet_h length:%d\n", SIZE_ETHERNET);
 					printf("ip_h length:%d\n", size_ip);
@@ -166,7 +166,7 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 					if (dlen > 0) {
 						//send packet
 						char payload[4] = { 0x01, 0x02, 0x03, 0x04 };
-						send_msg(ethernet, ip, tcp, dlen, data, payload);
+						send_msg(ethernet, ip, tcp, dlen, data, 4, payload);
 					}
 					break;
 				case IPPROTO_UDP:
@@ -184,10 +184,8 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 	}
 }
 
-void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, char *payload) {
-	u_int32_t payload_s = strlen(payload);
+int send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp *tcp, int dlen, char *data, u_int32_t payload_s, char *payload) {
 	libnet_t *net_t = NULL;
-	char err_buf[LIBNET_ERRBUF_SIZE];
 	libnet_ptag_t p_tag;
 
 	u_char src_mac[ETHER_ADDR_LEN]; //发送者网卡地址
@@ -215,38 +213,49 @@ void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp 
 	printf("##########################\n");
 	printf("send from:%s:%d to:%s:%d\n", src_ip_addr, src_port, dst_ip_addr, dst_port);
 	printf("##########################\n");
-	net_t = libnet_init(LIBNET_LINK_ADV, pat.out_dev, err_buf); //初始化发送包结构
+	net_t = libnet_init(LIBNET_LINK_ADV, pat.out_dev, pat.errbuf); //初始化发送包结构
 	if (net_t == NULL) {
 		printf("libnet_init error\n");
-		return;
+		return -1;
 	}
+
+	p_tag = libnet_build_tcp_options(
+			(uint8_t*) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000",
+			20,
+			net_t,
+			0);
+	if (p_tag == -1) {
+		fprintf(stderr, "Can't build TCP options: %s\n", libnet_geterror(net_t));
+		return -1;
+	}
+
 	//TCP
 	p_tag = libnet_build_tcp(
 			src_port,
 			dst_port,
 			0x01010101,
 			0x02020202,
-			TH_SYN,
-			32767,
+			TH_RST | TH_FIN,
 			0,
-			10,
-			LIBNET_TCP_H + 20 + payload_s,
-			(uint8_t*) payload,
-			payload_s,
+			0,
+			0,
+			LIBNET_TCP_H, //LIBNET_TCP_H + 20 + payload_s,
+			NULL, //payload
+			0, //payload_s
 			net_t,
 			0);
 	if (p_tag == -1) {
 		printf("libnet_build_tcp error");
-		return;
+		return -1;
 	}
 	//IP
-	u_int16_t len = LIBNET_IPV4_H + LIBNET_ICMPV4_ECHO_H + payload_s;
+	u_int16_t len = LIBNET_IPV4_H + LIBNET_TCP_H + payload_s;
 	p_tag = libnet_build_ipv4(
 			len, /* length */
 			0, /* TOS */
-			0x42, /* IP ID */
+			(u_short) libnet_get_prand(LIBNET_PRu16), /* id,随机产生0~65535 */
 			0, /* IP Frag */
-			64, /* TTL */
+			62, /* TTL */
 			IPPROTO_TCP, /* protocol */
 			0, /* checksum */
 			src_ip, /* source IP */
@@ -257,13 +266,13 @@ void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp 
 			0);
 	if (p_tag == -1) {
 		printf("libnet_build_ipv4 error");
-		return;
+		return -1;
 	}
 	//Ethernet
 	p_tag = libnet_build_ethernet(
 			(u_int8_t *) dst_mac, //dest mac addr
 			(u_int8_t *) src_mac, //source mac addr
-			ETHERTYPE_ARP, //protocol type
+			ETHERTYPE_IP, //protocol type
 			NULL, //payload
 			0, //payload length
 			net_t, //libnet context
@@ -271,13 +280,10 @@ void send_msg(struct sniff_ethernet *eth, struct sniff_ip *ip, struct sniff_tcp 
 			);
 	if (p_tag == -1) {
 		printf("libnet_build_ethernet error!\n");
+		return -1;
 	}
-	else {
-		int packet_size;
-		packet_size = libnet_write(net_t);
-		if (packet_size == -1) {
-			printf("libnet_write error!\n");
-		}
-	}
+	int packet_size;
+	packet_size = libnet_write(net_t);
+	printf("packet_size:%d\n", packet_size);
 	libnet_destroy(net_t);
 }
