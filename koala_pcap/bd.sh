@@ -1,5 +1,5 @@
 #!/bin/bash
-cd build/
+cd /tmp/demo/build/
 rm -fr *
 cmake ..
 make

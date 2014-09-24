@@ -64,6 +64,8 @@ int main(int argc, char **argv) {
 	}
 	pthread_join(pid_a, NULL);
 
+	libnet_destroy(net_t);
+
 	return 0;
 }
 
@@ -157,20 +159,7 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 
 						send_packet(iphdr->ip_src.s_addr, dst_port, iphdr->ip_dst.s_addr, src_port, seq, ack, 4, payload);
 						send_packet(iphdr->ip_dst.s_addr, src_port, iphdr->ip_src.s_addr, dst_port, ack, libnet_get_prand(LIBNET_PRu32), 4, payload);
-						/*
-						 u_char src_ip_addr[16], dst_ip_addr[16];
-						 strcpy(src_ip_addr, inet_ntoa(iphdr->ip_src));
-						 strcpy(dst_ip_addr, inet_ntoa(iphdr->ip_dst));
-						 printf("RST: %s<->%s\n", src_ip_addr, dst_ip_addr);
-						 */
 					}
-					/*
-					 printf("ethernet_h length:%d\n", SIZE_ETHERNET);
-					 printf("ip_h length:%d\n", size_ip);
-					 printf("ip_total length:%d\n", ntohs(iphdr->ip_len));
-					 printf("tcp_h length:%d\n", size_tcp);
-					 printf("src:%s:%d  dst:%s:%d data_len:%d\n", inet_ntoa(iphdr->ip_src), ntohs(tcphdr->th_sport), inet_ntoa(iphdr->ip_dst), ntohs(tcphdr->th_dport), dlen);
-					 */
 					break;
 				case IPPROTO_UDP:
 					break;
@@ -185,22 +174,6 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 		default:
 			printf("Unknown Type:%d\n", ethhdr->ether_type);
 	}
-	/*
-	 printf("id: %d\n", ++(*id));
-	 printf("Packet length: %d\n", pkthdr->len);
-	 printf("Number of bytes: %d\n", pkthdr->caplen);
-	 printf("Received time: %s", ctime((const time_t *) &pkthdr->ts.tv_sec));
-
-	 int i;
-	 for (i = 0; i < pkthdr->len; ++i) {
-	 printf(" %02x", packet[i]);
-	 if ((i + 1) % 16 == 0) {
-	 printf("\n");
-	 }
-	 }
-	 printf("\n\n");
-	 */
-
 }
 
 int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_t dst_port, u_int32_t seq, u_int32_t ack, u_int32_t payload_s, char *payload) {
@@ -247,6 +220,8 @@ int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_
 
 	int packet_size;
 	packet_size = libnet_write(net_t);
-	//printf("packet_size:%d\n", packet_size);
-	//libnet_destroy(net_t);
+	if(packet_size == -1) {
+		printf("packet error:%s\n",libnet_geterror(net_t));
+		return -1;
+	}
 }
