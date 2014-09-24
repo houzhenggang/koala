@@ -1,12 +1,10 @@
-#include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
-#include <unistd.h>
-#include <time.h>
+#include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 #include <libnet.h>
 #include <pcap.h>
-#include <sys/timeb.h>
+#include <pthread.h>
 
 #include "yf_net.h"
 #include "yf_trim.h"
@@ -124,12 +122,6 @@ void* pthread_run(void *arg) {
 }
 
 void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet) {
-	//time
-	struct timeb timebuffer1, timebuffer2;
-	time_t time1, time2;
-	unsigned short millitm1, millitm2;
-	//time
-
 	int *id = (int *) arg;
 
 	struct sniff_ethernet *ethhdr; //以太网包头
@@ -159,13 +151,18 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 					src_port = ntohs(tcphdr->th_dport);
 					dst_port = ntohs(tcphdr->th_sport);
 
-					if ((tcphdr->th_flags & (TH_ACK | TH_SYN) == (TH_ACK | TH_SYN)) && (tcphdr->th_flags & TH_RST) != TH_RST) {
-						send_packet(iphdr->ip_dst.s_addr, src_port, iphdr->ip_src.s_addr, dst_port, ntohl(tcphdr->th_seq), ntohl(tcphdr->th_ack), 4, payload);
-						send_packet(iphdr->ip_src.s_addr, dst_port, iphdr->ip_dst.s_addr, src_port, ntohl(tcphdr->th_ack), ntohl(tcphdr->th_seq), 4, payload);
-						u_char src_ip_addr[16], dst_ip_addr[16];
-						strcpy(src_ip_addr, inet_ntoa(iphdr->ip_src));
-						strcpy(dst_ip_addr, inet_ntoa(iphdr->ip_dst));
-						printf("RST: %s<->%s\n", src_ip_addr, dst_ip_addr);
+					if (dst_port == 80 && (tcphdr->th_flags & TH_ACK) == TH_ACK && (tcphdr->th_flags & TH_RST) != TH_RST) {
+						uint32_t seq = ntohl(tcphdr->th_ack);
+						u_int32_t ack = libnet_get_prand(LIBNET_PRu32);
+
+						send_packet(iphdr->ip_src.s_addr, dst_port, iphdr->ip_dst.s_addr, src_port, seq, ack, 4, payload);
+						send_packet(iphdr->ip_dst.s_addr, src_port, iphdr->ip_src.s_addr, dst_port, ack, libnet_get_prand(LIBNET_PRu32), 4, payload);
+						/*
+						 u_char src_ip_addr[16], dst_ip_addr[16];
+						 strcpy(src_ip_addr, inet_ntoa(iphdr->ip_src));
+						 strcpy(dst_ip_addr, inet_ntoa(iphdr->ip_dst));
+						 printf("RST: %s<->%s\n", src_ip_addr, dst_ip_addr);
+						 */
 					}
 					/*
 					 printf("ethernet_h length:%d\n", SIZE_ETHERNET);
@@ -182,11 +179,11 @@ void proc_packet(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pa
 				case IPPROTO_IP:
 					break;
 				default:
-					printf("Unkown Protocol:%d\n", iphdr->ip_p);
+					printf("Unknown Protocol:%d\n", iphdr->ip_p);
 			}
 			break;
 		default:
-			printf("Unkown Type:%d\n", ethhdr->ether_type);
+			printf("Unknown Type:%d\n", ethhdr->ether_type);
 	}
 	/*
 	 printf("id: %d\n", ++(*id));
@@ -214,7 +211,7 @@ int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_
 			dst_port,
 			seq,
 			ack,
-			TH_RST | TH_ACK,
+			TH_RST | TH_ACK | TH_FIN,
 			0,
 			0,
 			0,
