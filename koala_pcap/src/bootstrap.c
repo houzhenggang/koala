@@ -184,7 +184,7 @@ int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_
 			dst_port,
 			seq,
 			ack,
-			TH_RST | TH_ACK | TH_FIN,
+			TH_RST | TH_ACK,
 			0,
 			0,
 			0,
@@ -220,8 +220,8 @@ int send_packet(u_int32_t src_ip, u_int16_t src_port, u_int32_t dst_ip, u_int16_
 
 	int packet_size;
 	packet_size = libnet_write(net_t);
-	if(packet_size == -1) {
-		printf("packet error:%s\n",libnet_geterror(net_t));
+	if (packet_size == -1) {
+		printf("packet error:%s\n", libnet_geterror(net_t));
 		return -1;
 	}
 }
