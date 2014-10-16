@@ -1,41 +1,45 @@
-group = 'org.koala'
-
 allprojects {
-    project.version = prod
     apply plugin: 'java'
     apply plugin: 'scala'
     apply plugin: 'idea'
 
-    compileJava.options.encoding = 'utf-8'
-    compileTestJava.options.encoding = 'utf-8'
-    compileJava.options.warnings = false
-    compileTestJava.options.warnings = false
+    [compileJava,compileScala,compileTestJava,compileTestScala].options.collect {
+      it.encoding = 'utf-8'
+      it.warnings = false
+    }
+
+    group = 'org.koala'
+    project.version = prod
 
     repositories {
         mavenLocal()
+        mavenCentral()
         maven {
-            url 'http://221.231.148.202:8081/nexus/content/groups/public'
+            url 'http://maven.oschina.net/content/groups/public/'
         }
-    }
-
-    dependencies {
-        compile(
-                "org.slf4j:slf4j-api:$slf4j",
-                "ch.qos.logback:logback-core:${logback}",
-                "org.scala-lang:scala-library:${scala}"
-        )
-
-        // Scala compiler and related tools
-        scalaTools "org.scala-lang:scala-compiler:${scala}"
-
-        testCompile(
-                'junit:junit:4.10',
-                'org.specs2:specs2_2.10.1:1.12.3',
-                'com.h2database:h2:1.3.170'
-        )
     }
 }
 
 subprojects {
-}
+  apply plugin: 'maven'
+  uploadArchives {
+      repositories {
+          mavenDeployer {
+              repository(url: "file:///e:/repository/.m2")
+          }
+      }
+  }
+  dependencies {
+      compile(
+              "org.slf4j:slf4j-api:$slf4j",
+              "ch.qos.logback:logback-core:${logback}",
+              "org.scala-lang:scala-library:${scala}"
+      )
 
+      testCompile(
+              "junit:junit:4.10",
+              "org.specs2:specs2_2.10.1:1.12.3",
+              "com.h2database:h2:1.3.170"
+      )
+  }
+}

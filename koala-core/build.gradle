@@ -1,10 +1,6 @@
 dependencies {
     compile(
-            'org.freemarker:freemarker:$freemarkerVer',
-            "commons-io:commons-io:$commons_ioVer"
+            "org.freemarker:freemarker:${freemarker}",
+            "commons-io:commons-io:${commons_io}"
     )
 }
-task sayHello << {
-    println "Hello KOALA-CORE."
-}
-

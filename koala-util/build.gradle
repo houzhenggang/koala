@@ -1,9 +1,5 @@
 dependencies {
     compile(
-            "commons-codec:commons-codec:${commons_codecVer}"
+            "commons-codec:commons-codec:${commons_codec}"
     )
 }
-task sayHello << {
-    println "Hello KOALA-ORM."
-}
-
